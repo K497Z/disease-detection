@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# virtual env
+venv/
+.env/
+
+# model weights / checkpoints
+ckpts/
+pretrained_models/
+
+# logs & temp
+*.log
+.DS_Store

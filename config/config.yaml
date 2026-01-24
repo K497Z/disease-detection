@@ -1,0 +1,109 @@
+device: cuda:1
+#device: 'cpu'
+misc:
+  seed: 1
+
+experiment:
+  # image
+  input_resolution: [224, 224]
+  simclr_mlp: [512, 128, 512]
+  simclr_temperature: 0.1
+  # text
+  dropout: 0.05
+  eda_alpha: 0.05
+  back_trans: true
+  backtrans_p: 0.1
+  n_insert: 2
+  text_length: 77  #text-transformer中用到了，这里改为了150
+#  text_length: 160
+  # mix
+  mixgen: false
+  mixgen_type: cat  # ori or cat
+  mixgen_p: 0.1
+  mixgen_ratio: 0.1
+  mvs_image: true
+
+  # loss
+  nitc_ratio: 1.0
+  ####
+  ss: true
+  ss_ratio: 0.4
+  ####
+  ritc: true
+  ritc_eps: 1.0e-2
+  ritc_ratio: 1.0
+  ####
+  mlm: false
+  mlm_ratio: 1.0
+  cmt_depth: 4 # cross modal transformer self attn layers
+  ####
+  citc: true
+  citc_lambda1: 0.25
+  citc_lambda2: 0.25
+  citc_ratio: 0.1
+  ####
+  id: false
+  id_ratio: 1.0
+
+#schedule:
+#  lr: 1.0e-4
+#  epoch: 30 #
+#  epoch_warmup: 8
+#  lr_start: 1.0e-5  #
+#  lr_end: 5.0e-6  #
+#  weight_decay: 0.02
+#  betas: [ 0.9, 0.98 ]
+#  eps: 1.0e-8
+#  ratio_factor: 5.0
+schedule:
+  lr: 0.00005
+#  lr: 1.0e-4
+  epoch: 30 #
+  epoch_warmup: 15
+  lr_start: 1.0e-5  #
+  lr_end: 5.0e-6  #
+  weight_decay: 0.05
+  betas: [ 0.9, 0.98 ]
+  eps: 1.0e-8
+  ratio_factor: 5.0
+
+model:
+  ckpt_type: original_clip  # original_clip / saved
+  saved_path: 'ckpts/model'
+  checkpoint: 'ViT-B-16.pt'    # e.g., '../../data/CLIP/ViT-B-16.pt'
+  softlabel_ratio: 0.5
+  embed_dim: 512
+  vocab_size: 49408
+  #加的fusion参数
+  fusion:
+    d_model: 512
+    H: 8
+    N: 4
+    dropout: 0.1
+    state_prob: 1
+    decoder_number_layer: 4
+
+
+
+
+log:
+  print_period: 50
+
+data:
+  batch_size: 64
+  test_batch_size: 256
+#  batch_size: 1 #这里原本80
+#  test_batch_size: 5 #这里我改小了原本256
+#  num_workers: 8
+  num_workers: 8
+
+distributed:
+  backend: nccl
+  url: 'env://'
+
+#anno_dir: 'annotation/RSTPReid'    # e.g., 'data/CUHK-PEDES'
+#image_dir: 'RSTPReid/imgs'     # e.g., '../../datasets/cuhkpedes/imgs'
+#anno_dir: 'zhiwubindu\captions'
+#image_dir: 'zhiwubindu\images'
+anno_dir: 'plantdoc/captions'
+image_dir: 'plantdoc/images' #这里放服务器要改一下
