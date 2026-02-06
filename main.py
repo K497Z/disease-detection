@@ -1,3 +1,6 @@
+Here is the updated code with all comments translated into English. The code logic and structure remain unchanged.
+
+```python
 import os
 import random
 import time
@@ -21,7 +24,7 @@ def run(config):
     print(config)
 
     # data
-    dataloader = build_pedes_data(config)  # 调用 build_pedes_data 函数，构建训练和测试数据加载器（DataLoader）
+    dataloader = build_pedes_data(config)  # Call build_pedes_data function to construct train and test data loaders
     train_loader = dataloader['train_loader']
     num_classes = len(train_loader.dataset.pairs)
 
@@ -30,7 +33,7 @@ def run(config):
     best_epoch = 0
 
     # model
-    model = clip_vitb(config, num_classes)  # 用于构建一个基于 CLIP 架构的模型，其中视觉部分使用 Vision Transformer (ViT-B)，文本部分使用 Transformer
+    model = clip_vitb(config, num_classes)  # Used to build a model based on CLIP architecture, using Vision Transformer (ViT-B) for visual part and Transformer for text part
     model.to(config.device)
 
     model, load_result = load_checkpoint(model, config)
@@ -41,27 +44,27 @@ def run(config):
 
     # schedule
     config.schedule.niter_per_ep = len(train_loader)
-    lr_schedule = cosine_scheduler(config)  # cosine_scheduler 函数的主要作用是生成一个余弦退火学习率调度计划
+    lr_schedule = cosine_scheduler(config)  # The main function of cosine_scheduler is to generate a cosine annealing learning rate schedule
 
     # optimizer
     optimizer = build_optimizer(config, model)
 
     # train
     it = 0
-    scaler = torch.cuda.amp.GradScaler()  # cuda只适用于GPU环境，这里先注释
+    scaler = torch.cuda.amp.GradScaler()  # CUDA is only applicable to GPU environments, commented out here
 
-    # #定义损失函数
+    # # Define loss function
     criterion = torch.nn.CrossEntropyLoss()
 
-    #绘图
+    # Plotting
     test_loss_list = []
     test_acc_list = []
 
-    #early stopping
+    # early stopping
     best_acc = 0.0
     # patience = 30
     # counter = 0
-    #训练
+    # Training
     for epoch in range(config.schedule.epoch):
         print()
         if is_using_distributed():
@@ -71,44 +74,44 @@ def run(config):
         model.train()
 
         for i, batch in enumerate(train_loader):
-            # 学习率调度
+            # Learning rate scheduling
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr_schedule[it] * param_group['ratio']
                 # param_group['lr'] = 1.0e-5
-            # 软标签比例
+            # Soft label ratio
             if epoch == 0:
                 alpha = config.model.softlabel_ratio * min(1.0, i / len(train_loader))
             else:
                 alpha = config.model.softlabel_ratio
 
-            with torch.autocast(device_type='cuda'):  # 这里使用gpu：cuda所以我把它注释掉
-                outputs = model(batch, alpha)  # 这里一开始是不行的，但是我把batch_size改小之后就可以运行了
-                ids = batch['id'].long().to(config.device)  # 这行代码的主要功能是从输入数据字典 input 中提取样本的 ID 信息，
-                loss = criterion(outputs, ids) # 这里的ids不知道和学姐代码里面的label一个不
+            with torch.autocast(device_type='cuda'):  # Here using GPU: cuda, so I commented it out
+                outputs = model(batch, alpha)  # This didn't work at first, but it ran after I reduced the batch_size
+                ids = batch['id'].long().to(config.device)  # The main function of this line is to extract sample ID information from the input data dictionary
+                loss = criterion(outputs, ids) # Don't know if 'ids' here is the same as 'label' in the senior student's code
 
-            # 反向传播和优化
+            # Backward propagation and optimization
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            # loss.backward()#新加的
-            # optimizer.step()#新加的
+            # loss.backward() # newly added
+            # optimizer.step() # newly added
             model.zero_grad()
             optimizer.zero_grad()
             it += 1
 
-            if (i + 1) % config.log.print_period == 0:  # 这里是打印批次
+            if (i + 1) % config.log.print_period == 0:  # Print batch info here
                 info_str = f"Epoch[{epoch + 1}] Iteration[{i + 1}/{len(train_loader)}]"
                 info_str += f", loss: {loss.item():.4f}"
                 info_str += f", Base Lr: {param_group['lr']:.2e}"
                 print(info_str)
 
-        if is_master():#分布式情况下用，可以注释掉
+        if is_master(): # Used in distributed scenarios, can be commented out
             # end_time = time.time()
-            # time_per_batch = (end_time - start_time) / (i + 1)  # 计算每个 batch 的平均耗时和吞吐量，监控训练效率。
+            # time_per_batch = (end_time - start_time) / (i + 1)  # Calculate average time and throughput per batch to monitor training efficiency.
             # print("Epoch {} done. Time per batch: {:.3f}[s] Speed: {:.1f}[samples/s]"
             #       .format(epoch + 1, time_per_batch, train_loader.batch_size / time_per_batch))
 
-            # eval_result = test(model.module, dataloader['test_loader'], 77,config.device)  # 这里之前没有用并行化处理过，即没有被包装在并行化容器中，所以直接传model即可
+            # eval_result = test(model.module, dataloader['test_loader'], 77,config.device)  # It wasn't parallelized before (not wrapped in a parallel container), so just pass model directly
             loss,accuracy, precision, recall, f1 = test(model, dataloader['test_loader'], config.experiment.text_length, config.device)
             # rank_1, rank_5, rank_10, map = eval_result['r1'], eval_result['r5'], eval_result['r10'], eval_result['mAP']
             # print('Acc@1 {top1:.5f} Acc@5 {top5:.5f} Acc@10 {top10:.5f} mAP {mAP:.5f}'.format(top1=rank_1, top5=rank_5,
@@ -132,15 +135,15 @@ def run(config):
             # else:
                 # counter += 1
                 # if counter >= patience:
-                #     print(f"Early stopping at epoch {epoch}")
-                #     break
+                #      print(f"Early stopping at epoch {epoch}")
+                #      break
 
     print(f"best Acc@1: {best_rank_1} at epoch {best_epoch + 1}")
-    # ==== 画拟合曲线 ====
+    # ==== Plot fitting curves ====
     test_loss_list = [x.item() if isinstance(x, torch.Tensor) else x for x in test_loss_list]
     plt.figure(figsize=(12, 5))
 
-    # === Loss 曲线 ===
+    # === Loss Curve ===
     plt.subplot(1, 2, 1)
     plt.plot(test_loss_list, label='Test Loss', color='red')
     plt.xlabel('Epoch')
@@ -149,7 +152,7 @@ def run(config):
     plt.legend()
     plt.grid(True)
 
-    # === Accuracy 曲线 ===
+    # === Accuracy Curve ===
     plt.subplot(1, 2, 2)
     plt.plot(test_acc_list, label='Test Accuracy', color='orange')
     plt.xlabel('Epoch')
@@ -170,10 +173,12 @@ if __name__ == '__main__':
         config_path = 'config/s.config.yaml'
     config = parse_config(config_path)
 
-    Path(config.model.saved_path).mkdir(parents=True, exist_ok=True)  # 保存路径
+    Path(config.model.saved_path).mkdir(parents=True, exist_ok=True)  # Save path
 
-    init_distributed_mode(config)  # 是一个用于初始化分布式训练模式的函数
+    init_distributed_mode(config)  # A function used to initialize distributed training mode
 
     set_seed(config)
 
     run(config)
+
+```
