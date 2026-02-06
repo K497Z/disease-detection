@@ -1,6 +1,3 @@
-Here is the updated code with all comments translated into English. The code logic and structure remain unchanged.
-
-```python
 import os
 import random
 import time
@@ -180,5 +177,3 @@ if __name__ == '__main__':
     set_seed(config)
 
     run(config)
-
-```
