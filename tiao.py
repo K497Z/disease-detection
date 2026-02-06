@@ -18,7 +18,7 @@ def run(config):
     print(config)
 
     # data
-    dataloader = build_pedes_data(config)  # 调用 build_pedes_data 函数，构建训练和测试数据加载器（DataLoader）
+    dataloader = build_pedes_data(config)  # Call the build_pedes_data function to construct train and test data loaders (DataLoader)
     train_loader = dataloader['train_loader']
     num_classes = len(train_loader.dataset.person2text)
 
@@ -35,7 +35,7 @@ def run(config):
     best_epoch = 0
 
     # model
-    model = clip_vitb(config, num_classes)  # 用于构建一个基于 CLIP 架构的模型，其中视觉部分使用 Vision Transformer (ViT-B)，文本部分使用 Transformer
+    model = clip_vitb(config, num_classes)  # Used to build a model based on CLIP architecture, where the visual part uses Vision Transformer (ViT-B) and the text part uses Transformer
     model.to(config.device)
 
     model, load_result = load_checkpoint(model, config)
@@ -46,40 +46,40 @@ def run(config):
 
     # schedule
     config.schedule.niter_per_ep = len(train_loader)
-    lr_schedule = cosine_scheduler(config)  # cosine_scheduler 函数的主要作用是生成一个余弦退火学习率调度计划
+    lr_schedule = cosine_scheduler(config)  # The main function of cosine_scheduler is to generate a cosine annealing learning rate schedule
 
     # optimizer
     optimizer = build_optimizer(config, model)
 
     # train
     it = 0
-    scaler = torch.cuda.amp.GradScaler()  # cuda只适用于GPU环境，这里先注释
-    # accum_steps = 2  # 累积2个batch的梯度
+    scaler = torch.cuda.amp.GradScaler()  # cuda is only applicable to GPU environments, commented out here
+    # accum_steps = 2  # Accumulate gradients for 2 batches
 
     for epoch in range(config.schedule.epoch):
         print()
         if is_using_distributed():
             dataloader['train_sampler'].set_epoch(epoch)
 
-        start_time = time.time()  # time.time() 是 Python 标准库 time 模块中的函数，用于返回当前时间的时间戳（从 1970 年 1 月 1 日午夜开始的秒数）。这里将当前时间保存到 start_time 变量中，可能是为了后续计算每个 epoch 的训练时间
+        start_time = time.time()  # time.time() is a function in the Python standard library time module, returning the current timestamp (seconds since midnight Jan 1, 1970). Here, the current time is saved to start_time, likely to calculate the training time for each epoch
         for meter in meters.values():
-            meter.reset()  # 使得每个轮次的训练，meters这些参数都重新设置为0
+            meter.reset()  # Reset meters to 0 for each training epoch
         model.train()
 
         for i, batch in enumerate(train_loader):
-            # 将数据加载到 CPU
-            # batch = {k: v.to(config.device) for k, v in batch.items()},这个是我自己加的，但是数据集本来不是在cpu上面吗
+            # Load data to CPU
+            # batch = {k: v.to(config.device) for k, v in batch.items()}, I added this myself, but isn't the dataset originally on the CPU?
 
-            # 学习率调度
+            # Learning rate scheduling
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr_schedule[it] * param_group['ratio']
-            # 软标签比例
+            # Soft label ratio
             if epoch == 0:
                 alpha = config.model.softlabel_ratio * min(1.0, i / len(train_loader))
             else:
                 alpha = config.model.softlabel_ratio
 
-            # MixGen 数据增强
+            # MixGen data augmentation
             if config.experiment.mixgen:
                 if random.random() < config.experiment.mixgen_p:
                     import model.mixgen as mg
@@ -94,11 +94,11 @@ def run(config):
                         'caption': cap,
                     })
 
-            with torch.autocast(device_type='cuda'):  # 这里使用gpu：cuda所以我把它注释掉
-                ret = model(batch, alpha)  # 这里一开始是不行的，但是我把batch_size改小之后就可以运行了
+            with torch.autocast(device_type='cuda'):  # Using GPU: cuda here, so I commented it out
+                ret = model(batch, alpha)  # This didn't work at first, but it ran after I reduced the batch_size
                 loss = sum([v for k, v in ret.items() if "loss" in k])
 
-            # 更新损失记录
+            # Update loss records
             batch_size = batch['image'].shape[0]
             meters['loss'].update(loss.item(), batch_size)
             meters['nitc_loss'].update(ret.get('nitc_loss', 0), batch_size)
@@ -108,17 +108,17 @@ def run(config):
             meters['mlm_loss'].update(ret.get('mlm_loss', 0), batch_size)
             meters['id_loss'].update(ret.get('id_loss', 0), batch_size)
 
-            # 反向传播和优化
+            # Backward propagation and optimization
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            # loss.backward()#新加的
-            # optimizer.step()#新加的
+            # loss.backward() # newly added
+            # optimizer.step() # newly added
             model.zero_grad()
             optimizer.zero_grad()
             it += 1
 
-            if (i + 1) % config.log.print_period == 0:  # 这里是打印批次
+            if (i + 1) % config.log.print_period == 0:  # Print batch info here
                 info_str = f"Epoch[{epoch + 1}] Iteration[{i + 1}/{len(train_loader)}]"
                 # log loss
                 for k, v in meters.items():
@@ -129,12 +129,12 @@ def run(config):
 
         if is_master():
             end_time = time.time()
-            time_per_batch = (end_time - start_time) / (i + 1)  # 计算每个 batch 的平均耗时和吞吐量，监控训练效率。
+            time_per_batch = (end_time - start_time) / (i + 1)  # Calculate average time and throughput per batch to monitor training efficiency.
             print("Epoch {} done. Time per batch: {:.3f}[s] Speed: {:.1f}[samples/s]"
                   .format(epoch + 1, time_per_batch, train_loader.batch_size / time_per_batch))
 
             eval_result = test(model.module, dataloader['test_loader'], 77,
-                               config.device)  # 这里之前没有用并行化处理过，即没有被包装在并行化容器中，所以直接传model即可
+                               config.device)  # It wasn't parallelized before (not wrapped in a parallel container), so just pass model directly
             # eval_result = test(model, dataloader['test_loader'], 77, config.device)
             rank_1, rank_5, rank_10, map = eval_result['r1'], eval_result['r5'], eval_result['r10'], eval_result['mAP']
             print('Acc@1 {top1:.5f} Acc@5 {top5:.5f} Acc@10 {top10:.5f} mAP {mAP:.5f}'.format(top1=rank_1, top5=rank_5,
@@ -164,9 +164,9 @@ if __name__ == '__main__':
         config_path = 'config/s.config.yaml'
     config = parse_config(config_path)
 
-    Path(config.model.saved_path).mkdir(parents=True, exist_ok=True)  # 保存路径
+    Path(config.model.saved_path).mkdir(parents=True, exist_ok=True)  # Save path
 
-    init_distributed_mode(config)  # 是一个用于初始化分布式训练模式的函数
+    init_distributed_mode(config)  # A function used to initialize distributed training mode
 
     set_seed(config)
 
