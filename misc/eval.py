@@ -13,10 +13,10 @@ def test(model,test_loader , max_length, device):
     model.eval()
     all_preds = []
     all_labels = []
-    # 定义损失函数
+    # Define loss function
     criterion = torch.nn.CrossEntropyLoss()
 
-    with torch.no_grad():  # 只在需要的地方关闭梯度计算
+    with torch.no_grad():  # Disable gradient calculation only where needed
         for batch in test_loader:
             # images = batch['image'].to(device)
             # text_inputs = batch['text'].to(device)
@@ -24,17 +24,17 @@ def test(model,test_loader , max_length, device):
             # print("Batch content:", batch)
 
             labels = batch['id'].to(device)
-            # 前向传播
+            # Forward pass
             outputs = model(batch,1)
             loss = criterion(outputs, labels)
-            # 获取预测结果
+            # Get predictions
             preds = torch.argmax(outputs, dim=1)
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
 
 
-    # 计算各项评估指标
+    # Calculate evaluation metrics
     print(f"loss: {loss}")
     accuracy = accuracy_score(all_labels, all_preds)
     precision = precision_score(all_labels, all_preds, average='weighted', zero_division=1)
