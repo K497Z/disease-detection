@@ -13,11 +13,11 @@ from misc.caption_dataset import ps_train_dataset, ps_eval_dataset
 from misc.utils import is_using_distributed
 
 
-def get_self_supervised_augmentation(img_size):#用于生成自监督学习（如 SimCLR）中使用的数据增强管道。这些增强操作旨在通过随机变换生成正样本对，从而帮助模型学习更鲁棒的特征表示
-    class GaussianBlur(object):#用于实现高斯模糊增强，但是这个代码运行直接跳过了
+def get_self_supervised_augmentation(img_size):# Used to generate data augmentation pipelines for self-supervised learning (e.g., SimCLR). These augmentation operations aim to generate positive sample pairs through random transformations, thereby helping the model learn more robust feature representations.
+    class GaussianBlur(object):# Used to implement Gaussian blur augmentation, but this code execution is skipped directly.
         """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
 
-        def __init__(self, sigma=[.1, 2.]): #接受一个 sigma 参数，表示高斯模糊的标准差范围（例如 [0.1, 2.0]
+        def __init__(self, sigma=[.1, 2.]): # Accepts a sigma parameter representing the range of standard deviation for Gaussian blur (e.g., [0.1, 2.0])
             self.sigma = sigma
 
         def __call__(self, x):
@@ -28,11 +28,11 @@ def get_self_supervised_augmentation(img_size):#用于生成自监督学习（�
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-    aug = transforms.Compose([#将多个增强操作组合成一个管道
+    aug = transforms.Compose([# Combines multiple augmentation operations into a pipeline
         transforms.RandomResizedCrop(img_size, scale=(0.2, 1.), antialias=True),
         transforms.RandomApply([
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-        ], p=0.8),#p = 0.8 意味着有 80% 的概率会对输入图像应用 ColorJitter 操作
+        ], p=0.8),# p = 0.8 means there is an 80% probability of applying the ColorJitter operation to the input image
         transforms.RandomGrayscale(p=0.2),
         transforms.RandomApply([GaussianBlur([.1, 2.])], p=0.5),
         transforms.RandomHorizontalFlip(),
@@ -92,20 +92,20 @@ class cuhkpedes_eval(torch.utils.data.Dataset):
         return image, index
 
 
-def build_pedes_data(config):#用于构建训练和测试数据加载器（DataLoader）
+def build_pedes_data(config):# Used to build train and test data loaders (DataLoader)
     size = config.experiment.input_resolution
-    if isinstance(size, int):#从配置中获取图像分辨率，并将其转换为 (height, width) 格式，如果 size 是整数，则将其转换为 (size, size)，但这里不是所以直接跳过
+    if isinstance(size, int):# Get image resolution from config and convert it to (height, width) format. If size is an integer, convert it to (size, size), but it is not the case here, so skipped directly.
         size = (size, size)
 
     normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])#进行归一化操作时所使用的均值（mean）和标准差（std）
+        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])# Mean and standard deviation (std) used for normalization
     val_transform = transforms.Compose([
-        transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC, antialias=True),#Resize：将图像调整为指定分辨率
-        transforms.ToTensor(),#ToTensor：将图像转换为张量
-        normalize #Normalize：对图像进行归一化
+        transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC, antialias=True),# Resize: Adjusts the image to the specified resolution
+        transforms.ToTensor(),# ToTensor: Converts the image to a tensor
+        normalize # Normalize: Normalizes the image
     ])
 
-    # rand_from = [  # rand_from：包含多种数据增强操作（如颜色抖动、随机旋转、随机裁剪等
+    # rand_from = [  # rand_from: Contains various data augmentation operations (such as color jitter, random rotation, random cropping, etc.)
     #     # transforms.ColorJitter(.1, .1, .1, 0),
     #     # transforms.RandomRotation(15),
     #     # transforms.RandomResizedCrop(size, (0.9, 1.0), antialias=True),
@@ -113,7 +113,7 @@ def build_pedes_data(config):#用于构建训练和测试数据加载器（DataL
     #     # transforms.RandomHorizontalFlip(),
     #     # transforms.RandomErasing(scale=(0.10, 0.20)),
     # ]
-    rand_from = [#rand_from：包含多种数据增强操作（如颜色抖动、随机旋转、随机裁剪等
+    rand_from = [# rand_from: Contains various data augmentation operations (such as color jitter, random rotation, random cropping, etc.)
         transforms.ColorJitter(0.3, 0.4, 0.3, 0.1),
         # transforms.ColorJitter(contrast=(1.0,1.2)),
         transforms.RandomRotation(20),
@@ -123,11 +123,11 @@ def build_pedes_data(config):#用于构建训练和测试数据加载器（DataL
         transforms.RandomErasing(scale=(0.08, 0.15)),
         transforms.RandomVerticalFlip()
     ]
-    aug = Choose(rand_from, size) #从 rand_from 中选择两种数据增强操作
-    aug_ss = get_self_supervised_augmentation(size) #aug_ss可以直接应用到图像上
+    aug = Choose(rand_from, size) # Select two data augmentation operations from rand_from
+    aug_ss = get_self_supervised_augmentation(size) # aug_ss can be applied directly to images
 
 
-    train_dataset = ps_train_dataset(config.anno_dir, config.image_dir, aug, aug_ss, split='train', max_words=config.experiment.text_length)#这里原本是77，我给改成160了
+    train_dataset = ps_train_dataset(config.anno_dir, config.image_dir, aug, aug_ss, split='train', max_words=config.experiment.text_length)# This was originally 77, I changed it to 160
     test_dataset = ps_eval_dataset(config.anno_dir, config.image_dir, val_transform, split='test', max_words=config.experiment.text_length)
 
     if is_using_distributed():
@@ -140,10 +140,10 @@ def build_pedes_data(config):#用于构建训练和测试数据加载器（DataL
     train_loader = DataLoader(
         dataset=train_dataset,
         batch_size=config_data.batch_size,
-        shuffle=train_sampler is None,#数据打乱
-        num_workers=config_data.num_workers,#如果 num_workers > 0，DataLoader 会使用多进程加载数据，可能导致子进程崩溃
+        shuffle=train_sampler is None,# Shuffle data
+        num_workers=config_data.num_workers,# If num_workers > 0, DataLoader will use multi-processing to load data, which may cause child processes to crash
         pin_memory=True,
-        sampler=train_sampler,#采样策略
+        sampler=train_sampler,# Sampling strategy
         drop_last=True,
     )
     test_loader = DataLoader(
@@ -170,10 +170,10 @@ class Choose:
         self.size = size
 
     def __call__(self, image):
-        aug_choice = np.random.choice(self.choose_from, 3)#使用 np.random.choice 从 self.choose_from 中随机选择两个增强操作
+        aug_choice = np.random.choice(self.choose_from, 3)# Use np.random.choice to randomly select three augmentation operations from self.choose_from
         return transforms.Compose([
             transforms.Resize(self.size),
             transforms.ToTensor(),
-            *aug_choice,#动态插入随机选择的两个增强操作
+            *aug_choice,# Dynamically insert the randomly selected augmentation operations
             normalize
         ])(image)
