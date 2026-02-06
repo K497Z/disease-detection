@@ -74,5 +74,3 @@ Key dependencies include (see requirements.txt for full list):
 * Contribution: Contributions to improve the disease recognition 
   algorithms or bug reports are welcome via Issues or Pull Requests.
 
-
-==========================================================================
