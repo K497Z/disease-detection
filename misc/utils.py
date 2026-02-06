@@ -12,15 +12,15 @@ import torch.distributed as dist
 
 
 def parse_config(config_path):
-    #with open(config_path) as f: #这里改了
+    # with open(config_path) as f: # Changed here
     with open(config_path, encoding='utf-8') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     config = EasyDict(config)
     return config
 
 
-def is_using_distributed():#判断是否使用分布式参数
-    #return True
+def is_using_distributed():# Determine whether to use distributed parameters
+    # return True
     return False
 
 def is_dist_avail_and_initialized():
@@ -54,23 +54,23 @@ def wandb_record():
 
 
 def init_distributed_mode(config):
-    if is_using_distributed():#这里是一个函数，我给改成不使用分布式
-        config.distributed.rank = int(os.environ['RANK'])#设置当前进程的全局排名，rank 用于标识当前进程在分布式训练中的唯一 ID
-        config.distributed.world_size = int(os.environ['WORLD_SIZE'])#用于标识参与训练的总进程数
-        config.distributed.local_rank = int(os.environ['LOCAL_RANK'])#设置当前进程的本地排名
+    if is_using_distributed():# This is a function, I changed it to disable distributed mode
+        config.distributed.rank = int(os.environ['RANK'])# Set the global rank of the current process; rank is used to identify the unique ID in distributed training
+        config.distributed.world_size = int(os.environ['WORLD_SIZE'])# Used to identify the total number of processes participating in training
+        config.distributed.local_rank = int(os.environ['LOCAL_RANK'])# Set the local rank of the current process
         torch.distributed.init_process_group(backend=config.distributed.backend,
-                                             init_method=config.distributed.url)#初始化分布式进程组
-        used_for_printing(get_rank() == 0)#设置是否用于打印日志
+                                             init_method=config.distributed.url)# Initialize the distributed process group
+        used_for_printing(get_rank() == 0)# Set whether to enable printing logs
 
-    if torch.cuda.is_available():#torchcuda自定义环境，判断出来是没有的
+    if torch.cuda.is_available():# Custom torchcuda environment, determined as unavailable
         if is_using_distributed():
             device = f'cuda:{get_rank()}'
         else:
             device = f'cuda:{d}' if str(d := config.device).isdigit() else d
         torch.cuda.set_device(device)
     else:
-        device = 'cpu'#这里把变量变成cpu了
-    config.device = device #将设备信息保存到配置对象中
+        device = 'cpu'# Changed the variable to cpu here
+    config.device = device # Save device information to the configuration object
 
 
 def used_for_printing(is_master):
@@ -85,7 +85,7 @@ def used_for_printing(is_master):
     __builtin__.print = print
 
 
-def set_seed(config): #给各个配置随机种子
+def set_seed(config): # Set random seeds for configurations
     seed = config.misc.seed
 
     torch.manual_seed(seed)
