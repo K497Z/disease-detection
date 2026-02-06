@@ -35,17 +35,17 @@ def interpolate_text(pos_embed_checkpoint, target_dim=77):
     return pos_tokens
 
 
-def load_checkpoint(model, config):#这段代码定义了一个 load_checkpoint 函数，用于加载预训练模型的权重，并将其适配到当前模型的结构中。这个函数支持两种类型的检查点（checkpoint）：original_clip 和 saved
+def load_checkpoint(model, config):# This code defines a load_checkpoint function to load pre-trained model weights and adapt them to the current model structure. This function supports two types of checkpoints: original_clip and saved
     if config.model.ckpt_type == 'original_clip':
         with open(config.model.checkpoint, 'rb') as opened_file:
-            model_tmp = torch.jit.load(opened_file, map_location="cpu")#用于加载 CLIP 官方预训练的 TorchScript .pt 模型，并放到 CPU 上
-            state = model_tmp.state_dict()#提取 模型权重（参数）
-        for key in ["input_resolution", "context_length", "vocab_size"]:#CLIP .pt 模型的 state_dict 里 包含一些不必要的键
+            model_tmp = torch.jit.load(opened_file, map_location="cpu")# Used to load the official CLIP pre-trained TorchScript .pt model and place it on the CPU
+            state = model_tmp.state_dict()# Extract model weights (parameters)
+        for key in ["input_resolution", "context_length", "vocab_size"]:# The state_dict of the CLIP .pt model contains some unnecessary keys
                 del state[key]
 
         # 2 towers in new_state: visual, encode_text
         new_state = {}
-        for name, params in state.items():#在加载预训练模型参数时，对视觉位置编码（visual.positional_embedding）参数进行形状适配处理。在不同的模型或者不同的训练设置下，视觉位置编码的形状可能会有所不同，通过 resize_pos_embed 函数可以对预训练的位置编码参数进行调整，使其形状与当前模型的视觉位置编码参数相匹配，从而能够正确地加载到当前模型中
+        for name, params in state.items():# When loading pre-trained model parameters, adapt the visual positional embedding parameters. The shape of visual positional embeddings may vary under different models or training settings. The resize_pos_embed function adjusts the pre-trained positional embedding parameters to match the shape of the current model's parameters, ensuring they can be correctly loaded.
             if name == 'visual.positional_embedding' and params.shape != model.visual.positional_embedding.shape:
                 params = resize_pos_embed(params, model.visual.positional_embedding, model.visual.num_y, model.visual.num_x)
 
@@ -63,31 +63,31 @@ def load_checkpoint(model, config):#这段代码定义了一个 load_checkpoint 
     else:
         raise KeyError
 
-    load_result = model.load_state_dict(new_state, strict=False)#model.load_state_dict()：这是 PyTorch 模型对象的一个方法，其作用是把指定的状态字典加载到模型里。
-   #load_result：该方法会返回一个 namedtuple 对象，包含两个属性：missing_keys：这是一个列表，里面存储着模型中有但状态字典里没有的参数名称。unexpected_keys：这也是一个列表，存储着状态字典中有但模型里不存在的参数名称
-    return model, load_result #载了新状态字典的模型 model 以及加载结果 load_result 作为元组返回
+    load_result = model.load_state_dict(new_state, strict=False)# model.load_state_dict(): This is a method of the PyTorch model object used to load the specified state dictionary into the model.
+    # load_result: This method returns a namedtuple object containing two attributes: missing_keys (a list of parameter names present in the model but missing in the state dictionary) and unexpected_keys (a list of parameter names present in the state dictionary but missing in the model).
+    return model, load_result # Return the model loaded with the new state dictionary and the load_result as a tuple
 
 
-def cosine_scheduler(config):#定义一个名为 cosine_scheduler 的函数，其主要功能是生成一个余弦退火学习率调度计划，并且可以包含预热（warmup）阶段
-    #该函数会根据传入的配置对象 config 生成一个学习率调度数组，此数组规定了在整个训练过程里每个迭代步骤对应的学习率。这个调度计划结合了预热阶段和余弦退火阶段，预热阶段学习率从较低值逐渐增加到基础值，而余弦退火阶段学习率会从基础值逐渐降低到最终值
+def cosine_scheduler(config):# Define a function named cosine_scheduler, whose main function is to generate a cosine annealing learning rate schedule, which can include a warmup phase.
+    # This function generates a learning rate schedule array based on the passed configuration object `config`. This array specifies the learning rate for each iteration step throughout the training process. The schedule combines a warmup phase and a cosine annealing phase. In the warmup phase, the learning rate gradually increases from a lower value to the base value, and in the cosine annealing phase, the learning rate gradually decreases from the base value to the final value.
     schedule_config = config.schedule
-    base_value = schedule_config.lr #基础学习率，也就是预热阶段结束后使用的学习率
-    start_warmup_value = schedule_config.lr_start #预热阶段开始时的学习率
-    final_value = schedule_config.lr_end #余弦退火阶段结束时的最终学习率
+    base_value = schedule_config.lr # Base learning rate, i.e., the learning rate used after the warmup phase
+    start_warmup_value = schedule_config.lr_start # Learning rate at the start of the warmup phase
+    final_value = schedule_config.lr_end # Final learning rate at the end of the cosine annealing phase
     epochs = schedule_config.epoch
-    warmup_epochs = schedule_config.epoch_warmup #warmup_epochs：预热阶段的轮数
-    niter_per_ep = schedule_config.niter_per_ep #niter_per_ep：每个训练轮次的迭代次数
+    warmup_epochs = schedule_config.epoch_warmup # warmup_epochs: Number of epochs for the warmup phase
+    niter_per_ep = schedule_config.niter_per_ep # niter_per_ep: Number of iterations per training epoch
 
     warmup_schedule = np.array([])
-    warmup_iters = warmup_epochs * niter_per_ep #得到整个热身阶段的总迭代次数
+    warmup_iters = warmup_epochs * niter_per_ep # Get the total number of iterations for the entire warmup phase
     if warmup_epochs > 0:
-        warmup_schedule = np.linspace(start_warmup_value, base_value, warmup_iters)#warmup_schedule：生成的等差数列，包含 warmup_iters 个元素，从 start_warmup_value 开始，到 base_value 结束，每个元素代表一个迭代步骤的学习率
+        warmup_schedule = np.linspace(start_warmup_value, base_value, warmup_iters)# warmup_schedule: Generated arithmetic progression containing warmup_iters elements, starting from start_warmup_value and ending at base_value, where each element represents the learning rate for an iteration step.
 
-    iters = np.arange(epochs * niter_per_ep - warmup_iters)#从 0 到 epochs * niter_per_ep - warmup_iters - 1 的整数数组 iters，这个数组代表了余弦退火阶段的所有迭代步骤
-    schedule = final_value + 0.5 * (base_value - final_value) * (1 + np.cos(np.pi * iters / len(iters))) #最终得到一个数组 schedule，其中每个元素代表余弦退火阶段每个迭代步骤对应的学习率
+    iters = np.arange(epochs * niter_per_ep - warmup_iters)# Integer array `iters` from 0 to epochs * niter_per_ep - warmup_iters - 1, representing all iteration steps in the cosine annealing phase.
+    schedule = final_value + 0.5 * (base_value - final_value) * (1 + np.cos(np.pi * iters / len(iters))) # Finally obtain an array `schedule`, where each element represents the learning rate for each iteration step in the cosine annealing phase.
 
-    schedule = np.concatenate((warmup_schedule, schedule)) #这行代码将预热阶段的学习率调度数组和余弦退火阶段的学习率调度数组连接起来，形成一个完整的学习率调度数组
-    assert len(schedule) == epochs * niter_per_ep #assert 是 Python 中的一个断言语句，用于检查某个条件是否为真。如果条件为假，则会抛出 AssertionError 异常
+    schedule = np.concatenate((warmup_schedule, schedule)) # This line concatenates the warmup phase learning rate schedule array and the cosine annealing phase learning rate schedule array to form a complete learning rate schedule array.
+    assert len(schedule) == epochs * niter_per_ep # assert is an assertion statement in Python used to check if a condition is true. If the condition is false, an AssertionError is raised.
     return schedule
 
 
@@ -110,25 +110,25 @@ def cosine_scheduler(config):#定义一个名为 cosine_scheduler 的函数，�
 #     return optimizer
 
 
-def build_optimizer(config, model):#根据给定的配置对象 config 和模型 model 构建一个 AdamW 优化器
-    #该函数会遍历模型的所有可训练参数，根据参数的属性（如维度、名称等）为不同的参数设置不同的权重衰减（weight decay）和学习率调整比例（ratio），然后使用这些参数配置创建一个 AdamW 优化器
-    params = [] #用于存储每个可训练参数的配置信息，最终会作为 AdamW 优化器的参数列表
+def build_optimizer(config, model):# Build an AdamW optimizer based on the given configuration object `config` and model `model`.
+    # This function iterates through all trainable parameters of the model, sets different weight decay and learning rate adjustment ratios based on parameter attributes (such as dimensions, names, etc.), and then creates an AdamW optimizer using these configurations.
+    params = [] # Used to store configuration information for each trainable parameter, eventually serving as the parameter list for the AdamW optimizer.
     schedule_config = config.schedule
-    for n, p in model.named_parameters():#model.named_parameters() 方法遍历模型的所有参数，n 是参数的名称，p 是参数的张量
-        if not p.requires_grad:#如果参数的 requires_grad 属性为 False，说明该参数是冻结的，不需要进行训练，因此跳过该参数
+    for n, p in model.named_parameters():# model.named_parameters() method iterates through all parameters of the model, where n is the parameter name and p is the parameter tensor.
+        if not p.requires_grad:# If the parameter's requires_grad attribute is False, it means the parameter is frozen and does not need training, so skip it.
             continue  # frozen weights
-        weight_decay = schedule_config.weight_decay #初始化权重衰减 weight_decay 为配置文件中指定的值，L2正则化公式中λ是权重衰减系数
-        #λ ：权重衰减系数，是一个超参数，需要人为设定。它对正则化项的影响程度起到控制作用，λ越大，正则化的力度就越强
-        ratio = 1. #初始化学习率调整比例 ratio 为 1.0在一个包含多个子模块的模型中，某些子模块可能需要更快地学习到数据的特征，而另一些子模块则需要更稳定地进行调整。通过设置不同的学习率调整比例，可以为这些不同的子模块或参数组分配不同的学习率，从而提高模型的训练效率和性能
+        weight_decay = schedule_config.weight_decay # Initialize weight_decay to the value specified in the configuration file. In the L2 regularization formula, λ is the weight decay coefficient.
+        # λ: Weight decay coefficient, a hyperparameter that needs to be set manually. It controls the impact of the regularization term; the larger λ is, the stronger the regularization.
+        ratio = 1. # Initialize learning rate adjustment ratio to 1.0. In a model containing multiple sub-modules, some sub-modules may need to learn features faster, while others need more stable adjustments. By setting different learning rate ratios, different learning rates can be assigned to these different sub-modules or parameter groups, improving model training efficiency and performance.
 
-        if p.ndim < 2 or 'bias' in n or 'ln' in n or 'bn' in n:#如果参数的维度小于 2（例如标量或向量），或者参数名称中包含 'bias'、'ln'（可能表示层归一化层）或 'bn'（可能表示批归一化层），则将权重衰减设置为 0。这是因为对于这些类型的参数，通常不需要进行权重衰减，以避免影响模型的稳定性
+        if p.ndim < 2 or 'bias' in n or 'ln' in n or 'bn' in n:# If the parameter dimension is less than 2 (e.g., scalar or vector), or the parameter name contains 'bias', 'ln' (likely layer normalization), or 'bn' (likely batch normalization), set weight decay to 0. This is because weight decay is usually not needed for these types of parameters to avoid affecting model stability.
             weight_decay = 0.
-        if "cross" in n or "classifier" in n or "mlm_head" in n: #如果参数名称中包含 'cross'、'classifier' 或 'mlm_head'，则将学习率调整比例 ratio 乘以配置文件中指定的 ratio_factor（默认值为 5.0）。这意味着这些参数的学习率会比其他参数更高，以加快这些部分的训练速度
+        if "cross" in n or "classifier" in n or "mlm_head" in n: # If the parameter name contains 'cross', 'classifier', or 'mlm_head', multiply the learning rate adjustment ratio by the ratio_factor specified in the configuration file (default is 5.0). This means the learning rate for these parameters will be higher than others to speed up training for these parts.
             ratio = ratio * schedule_config.ratio_factor  # default 5.0
 
-        params += [{"params": [p], "weight_decay": weight_decay, "ratio": ratio}] #将当前参数的配置信息（参数张量、权重衰减和学习率调整比例）封装成一个字典，并添加到 params 列表中
+        params += [{"params": [p], "weight_decay": weight_decay, "ratio": ratio}] # Encapsulate the current parameter's configuration information (parameter tensor, weight decay, and learning rate ratio) into a dictionary and add it to the params list.
 
     optimizer = torch.optim.AdamW(params, lr=schedule_config.lr, betas=schedule_config.betas,
-                                  eps=schedule_config.eps, weight_decay=schedule_config.weight_decay)#使用 torch.optim.AdamW 创建一个 AdamW 优化器
+                                  eps=schedule_config.eps, weight_decay=schedule_config.weight_decay)# Create an AdamW optimizer using torch.optim.AdamW.
 
     return optimizer
