@@ -1,23 +1,23 @@
 import torch
 import torch.nn.functional as F
 
-#这段代码实现了 SimCLR损失函数的计算。SimCLR 是一种无监督学习方法，用于学习图像的特征表示。其核心思想是通过对比同一图像的不同增强视图（正样本对）和不同图像的视图（负样本对）来优化模型，使得正样本对在特征空间中更接近，负样本对更远离
+# This code implements the calculation of the SimCLR loss function. SimCLR is an unsupervised learning method used to learn feature representations of images. Its core idea is to optimize the model by contrasting different augmented views of the same image (positive pairs) and views of different images (negative pairs), making positive pairs closer in feature space and negative pairs further apart.
 def compute_simclr_loss(logits_a, logits_b, logits_a_gathered, logits_b_gathered, labels, temperature):
-    sim_aa = logits_a @ logits_a_gathered.t() / temperature #除以 temperature（温度参数）主要是为了调整相似度得分的分布
-    #这里用点积计算相似度，类似于余弦相似度，表征图像的距离远近
+    sim_aa = logits_a @ logits_a_gathered.t() / temperature # Dividing by temperature is mainly to adjust the distribution of similarity scores
+    # Here dot product is used to compute similarity, similar to cosine similarity, representing the distance between images
     sim_ab = logits_a @ logits_b_gathered.t() / temperature
     sim_ba = logits_b @ logits_a_gathered.t() / temperature
     sim_bb = logits_b @ logits_b_gathered.t() / temperature
-    #用于对比第一组增强视图内不同样本之间的相似度，在后续损失计算中，需要通过掩码操作排除自身与自身的相似度得分，避免模型将样本自身作为正样本进行错误学习
-    #正样本对：同一图像的两个增强视图（例如，样本 1 的 logits_a 与 logits_b 中的对应视图）的相似度得分位于 sim_ab 的对角线上（如 sim_ab_11）。负样本对：其他所有样本的相似度得分（包括组内和组间）。
-    masks = torch.where(F.one_hot(labels, logits_a_gathered.size(0)) == 0, 0, float('-inf'))#当独热编码矩阵中的元素为 0（即 condition 为 True）时，掩码矩阵对应位置的值为 0；当独热编码矩阵中的元素为 1（即 condition 为 False）时，掩码矩阵对应位置的值为负无穷大 float('-inf'),在后续的计算中，将这个掩码矩阵加到相似度得分矩阵上，那些对应负无穷大的位置在进行 softmax 等操作时，会使得这些位置的概率趋近于 0，从而达到屏蔽样本自身相似度得分的目的
-    #在进行对比学习时，模型需要区分正样本对（同一图像的不同增强视图）和负样本对（不同图像的视图）
+    # Used to compare similarity between different samples within the first group of augmented views. In subsequent loss calculation, masking is needed to exclude self-similarity scores to avoid the model wrongly learning the sample itself as a positive sample.
+    # Positive pairs: Similarity scores of two augmented views of the same image (e.g., corresponding views in logits_a and logits_b for sample 1) are on the diagonal of sim_ab (e.g., sim_ab_11). Negative pairs: Similarity scores of all other samples (including intra-group and inter-group).
+    masks = torch.where(F.one_hot(labels, logits_a_gathered.size(0)) == 0, 0, float('-inf'))# When the element in the one-hot encoding matrix is 0 (i.e., condition is True), the value at the corresponding position in the mask matrix is 0; when the element is 1 (i.e., condition is False), the value is negative infinity float('-inf'). In subsequent calculations, adding this mask matrix to the similarity score matrix ensures that positions corresponding to negative infinity will have probabilities approaching 0 during operations like softmax, thereby achieving the purpose of masking the sample's self-similarity score.
+    # In contrastive learning, the model needs to distinguish between positive pairs (different augmented views of the same image) and negative pairs (views of different images)
     sim_aa += masks
     sim_bb += masks
-    sim_a = torch.cat([sim_ab, sim_aa], 1)#这样做也是为了将正样本对（sim_ba 中包含同一图像不同增强视图的相似度得分）和负样本对（sim_bb 中包含不同图像第二组增强视图之间的相似度得分）的相似度得分整合，用于后续损失计算，让模型更好地区分正样本对和负样本对
+    sim_a = torch.cat([sim_ab, sim_aa], 1)# This is also done to integrate similarity scores of positive pairs (sim_ba contains scores of different augmented views of the same image) and negative pairs (sim_bb contains similarity scores between the second group of augmented views of different images) for subsequent loss calculation, allowing the model to better distinguish between positive and negative pairs.
     sim_b = torch.cat([sim_ba, sim_bb], 1)
-    loss_a = F.cross_entropy(sim_a, labels)#是标记正样本对的标签。在 SimCLR 中，正样本对是指同一图像的不同增强视图，labels 用于告诉模型哪些是正样本对
-    #交叉熵损失（Cross-Entropy Loss）常用于分类任务，衡量预测概率分布与真实标签分布之间的差异。在对比学习中，它被巧妙地用于迫使模型将正样本对的相似度得分最大化，负样本对的得分最小化
-    #标记正样本对的位置：对于每个样本 i，其正样本对的相似度得分在 sim_ab 中位于第 i 列（假设 logits_b_gathered 包含所有进程的样本
+    loss_a = F.cross_entropy(sim_a, labels)# Labels marking positive pairs. In SimCLR, positive pairs refer to different augmented views of the same image, and labels are used to tell the model which are positive pairs.
+    # Cross-Entropy Loss is commonly used in classification tasks to measure the difference between predicted probability distribution and true label distribution. In contrastive learning, it is cleverly used to force the model to maximize the similarity score of positive pairs and minimize the score of negative pairs.
+    # Marking the position of positive pairs: For each sample i, the similarity score of its positive pair is located in the i-th column in sim_ab (assuming logits_b_gathered contains samples from all processes
     loss_b = F.cross_entropy(sim_b, labels)
     return (loss_a + loss_b) * 0.5
