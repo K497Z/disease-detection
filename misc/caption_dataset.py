@@ -15,7 +15,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 Image.MAX_IMAGE_PIXELS = None
 
 
-class ps_train_dataset(Dataset):#若要使用 DataLoader 加载数据，往往需要自定义一个继承自 torch.utils.data.Dataset 的类
+class ps_train_dataset(Dataset):# To use DataLoader for data loading, a custom class inheriting from torch.utils.data.Dataset is often required
     def __init__(self, ann_root, image_root, transform, aug_ss, split, max_words=30):
         ann_file = os.path.join(ann_root, split, 'converted_reformatted.json')
         # ann_file = os.path.join(ann_root, split, 'converted_augment.json')
@@ -23,22 +23,22 @@ class ps_train_dataset(Dataset):#若要使用 DataLoader 加载数据，往往�
         anns = json.load(open(ann_file, encoding='utf-8'))
         self.transform = transform
 
-        self.person2text = defaultdict(list) #使用 defaultdict(list) 初始化一个字典，用于存储每个人物索引对应的文本列表。当访问不存在的键时，defaultdict 会自动创建一个空列表作为默认值
-        person_id2idx = {} # ID 到索引的映射关系
-        n = 0 #一个计数器，用于为每个人物分配唯一的索引
-        self.pairs = [] #self.pairs：一个列表，用于存储图像路径、文本描述、回译文本描述和人物索引的元组
+        self.person2text = defaultdict(list) # Initialize a dictionary using defaultdict(list) to store the list of texts corresponding to each person index. When accessing a non-existent key, defaultdict automatically creates an empty list as the default value
+        person_id2idx = {} # Mapping relationship from ID to index
+        n = 0 # A counter used to assign a unique index to each person
+        self.pairs = [] # self.pairs: A list used to store tuples of image path, text description, back-translated text description, and person index
 
-        for ann in anns: #ann是列表里面每个字典元素
-            image_path = os.path.join(image_root, split ,ann['file_path'])#获取图片路径
+        for ann in anns: # ann is each dictionary element in the list
+            image_path = os.path.join(image_root, split ,ann['file_path'])# Get image path
             # image_path = os.path.join(image_root, ann['file_path'])
             person_id = ann['id']
-            if person_id not in person_id2idx.keys(): #给每个person_id配一个索引
+            if person_id not in person_id2idx.keys(): # Assign an index to each person_id
                 person_id2idx[person_id] = n
                 n += 1
             person_idx = person_id2idx[person_id]
             if 'captions_bt' not in ann:
-                ann['captions_bt'] = [''] * len(ann['captions'])#列表与整数相乘的操作会将列表中的元素重复指定的次数。这里将只包含一个空字符串的列表 [''] 乘以 ann['captions'] 的长度，就会得到一个长度与 ann['captions'] 相同、元素都为空字符串的列表
-            for caption, caption_bt in zip(ann['captions'], ann['captions_bt']):#使用 zip() 函数同时遍历原始文本描述 captions 和回译文本描述 captions_bt
+                ann['captions_bt'] = [''] * len(ann['captions'])# The operation of multiplying a list by an integer repeats the elements in the list a specified number of times. Here, multiplying the list [''] containing only one empty string by the length of ann['captions'] results in a list of empty strings with the same length as ann['captions']
+            for caption, caption_bt in zip(ann['captions'], ann['captions_bt']):# Use the zip() function to simultaneously iterate through the original text descriptions captions and the back-translated text descriptions captions_bt
                 caption = pre_caption(caption, max_words)
                 caption_bt = pre_caption(caption_bt, max_words)
                 self.pairs.append((image_path, caption, caption_bt, person_idx))
@@ -47,31 +47,31 @@ class ps_train_dataset(Dataset):#若要使用 DataLoader 加载数据，往往�
 
             # captions = ann['captions']
             # captions_bt = ann['captions_bt']
-            # # 保证每张图片有至少两个描述，缺失就复制一份
+            # # Ensure each image has at least two descriptions; duplicate if missing
             # if len(captions) >= 2:
             #     caption_1 = pre_caption(captions[0], max_words)
             #     caption_2 = pre_caption(captions[1], max_words)
             # else:
             #     caption_1 = pre_caption(captions[0], max_words)
-            #     caption_2 = caption_1  # 如果只有一个描述，就复制
+            #     caption_2 = caption_1  # If there is only one description, duplicate it
             #
-            # # 处理回译 captions_bt
+            # # Process back-translated captions_bt
             # if len(captions_bt) >= 2:
             #     bt_1 = pre_caption(captions_bt[0], max_words)
             #     bt_2 = pre_caption(captions_bt[1], max_words)
             # else:
             #     bt_1 = pre_caption(captions_bt[0], max_words)
-            #     bt_2 = bt_1  # 如果只有一个回译描述，就复制
+            #     bt_2 = bt_1  # If there is only one back-translated description, duplicate it
             #
             # self.pairs.append((image_path, caption_1, caption_2, bt_1, bt_2, person_idx))
 
         self.augmentation_ss = aug_ss
-#aug_ss 通常是专门为自监督学习（Self-Supervised Learning）设计的数据增强操作。自监督学习是一种无需人工标注数据的学习方式，通过构建一些代理任务（如预测图像的旋转角度、判断图像的裁剪位置等）让模型自动学习到数据的内在结构和特征。其目的是生成正样本对（即从同一图像通过不同的增强操作得到的两个不同版本的图像），让模型学习到不同视角下图像的不变特征
-#transform 通常是一个常规的数据预处理和增强的组合操作，其目的是将原始图像数据转换为适合模型输入的格式，同时通过一些常见的增强手段（如调整大小、裁剪、翻转等）增加数据的多样性，帮助模型学习到更具泛化能力的特征。它主要侧重于为模型训练提供多样化但相对稳定的输入数据。其目的是将原始图像数据转换为适合模型输入的格式，同时通过一些常见的增强手段（如调整大小、裁剪、翻转等）增加数据的多样性，帮助模型学习到更具泛化能力的特征。它主要侧重于为模型训练提供多样化但相对稳定的输入数据
+# aug_ss is typically a data augmentation operation specifically designed for Self-Supervised Learning. Self-supervised learning is a learning method without manual data annotation, which allows the model to automatically learn the internal structure and features of data by constructing proxy tasks (such as predicting image rotation angle, determining image crop position, etc.). Its purpose is to generate positive sample pairs (i.e., two different versions of images obtained from the same image through different augmentation operations), allowing the model to learn invariant features of images under different perspectives.
+# transform is usually a combined operation of conventional data preprocessing and augmentation. Its purpose is to convert raw image data into a format suitable for model input, while increasing data diversity through common augmentation means (such as resizing, cropping, flipping, etc.) to help the model learn more generalizable features. It mainly focuses on providing diverse but relatively stable input data for model training.
     def __len__(self):
         return len(self.pairs)
 
-    def __getitem__(self, index):#该方法的主要功能是根据给定的索引 index，从数据集的样本对列表 self.pairs 中获取对应的图像路径、文本描述等信息，然后对图像进行一系列的处理和数据增强操作，最后将处理后的图像、文本描述以及其他相关信息封装成一个字典并返回
+    def __getitem__(self, index):# The main function of this method is to obtain the corresponding image path, text description, and other information from the dataset's sample pair list self.pairs based on the given index, then perform a series of processing and data augmentation operations on the image, and finally encapsulate the processed image, text description, and other related information into a dictionary and return it.
         # image_path, caption_1,caption_2,bt_1,bt_2, person = self.pairs[index]
         image_path, caption,caption_bt, person = self.pairs[index]
 
@@ -79,7 +79,7 @@ class ps_train_dataset(Dataset):#若要使用 DataLoader 加载数据，往往�
         image = self.transform(image_pil.convert('RGB'))
         aug1 = self.transform(image_pil.convert('RGB'))
         # aug_ss_1 = self.augmentation_ss(image_pil)
-        # aug_ss_2 = self.augmentation_ss(image_pil) #这里我都手动给改成RGB形式了
+        # aug_ss_2 = self.augmentation_ss(image_pil) # I have manually changed it to RGB format here
         aug_ss_1 = self.augmentation_ss(image_pil.convert('RGB'))
         aug_ss_2 = self.augmentation_ss(image_pil.convert('RGB'))
         return {
@@ -109,8 +109,8 @@ class ps_eval_dataset(Dataset):
         # self.txt2person = []
         # self.img2person = []
         self.person2text = defaultdict(list)
-        person_id2idx = {}  # ID 到索引的映射关系
-        n = 0  # 一个计数器，用于为每个人物分配唯一的索引
+        person_id2idx = {}  # Mapping relationship from ID to index
+        n = 0  # A counter used to assign a unique index to each person
         self.pairs = []
 
         for ann in anns:
@@ -118,25 +118,25 @@ class ps_eval_dataset(Dataset):
             # image_path = os.path.join(image_root, ann['file_path'])
 
             person_id = ann['id']
-            if person_id not in person_id2idx.keys(): #给每个person_id配一个索引
+            if person_id not in person_id2idx.keys(): # Assign an index to each person_id
                 person_id2idx[person_id] = n
                 n += 1
             person_idx = person_id2idx[person_id]
 
             # captions = ann['captions']
-            # # 保证每张图片有至少两个描述，缺失就复制一份
+            # # Ensure each image has at least two descriptions; duplicate if missing
             # if len(captions) >= 2:
             #     caption_1 = pre_caption(captions[0], max_words)
             #     caption_2 = pre_caption(captions[1], max_words)
             # else:
             #     caption_1 = pre_caption(captions[0], max_words)
-            #     caption_2 = caption_1  # 如果只有一个描述，就复制
+            #     caption_2 = caption_1  # If there is only one description, duplicate it
             #
             # self.pairs.append((image_path, caption_1, caption_2, person_idx))
 
-            for caption in ann['captions']:#ann['captions'] 存储了当前数据条目中所有的文本描述
+            for caption in ann['captions']:# ann['captions'] stores all text descriptions in the current data entry
                 caption = pre_caption(caption, max_words)
-                # self.txt2person.append(person_id)#这两个是把单词与id对应起来
+                # self.txt2person.append(person_id)# These two correspond words to IDs
                 self.pairs.append((image_path, caption, person_idx))
 
     def __len__(self):
@@ -176,6 +176,6 @@ def pre_caption(caption, max_words=50):
     # truncate caption
     caption_words = caption.split(' ')
     if len(caption_words) > max_words:
-        caption = ' '.join(caption_words[:max_words])#caption_words[:max_words]：这是一个切片操作，从 caption_words 列表中截取前 max_words 个元素。
-        #' '.join(...)：这是字符串的 join() 方法，用于将一个可迭代对象（这里是列表）中的元素连接成一个字符串。' ' 表示连接时使用空格作为分隔符
+        caption = ' '.join(caption_words[:max_words])# caption_words[:max_words]: This is a slicing operation that extracts the first max_words elements from the caption_words list.
+        # ' '.join(...): This is the string join() method, used to concatenate elements in an iterable object (here a list) into a string. ' ' indicates using a space as the separator during concatenation.
     return caption
