@@ -1,7 +1,3 @@
-==========================================================================
-                Plant Disease Detection System (CLIP-based)
-==========================================================================
-
 1. Title
 --------
 Cross-modal Plant Disease Detection System based on CLIP Architecture
@@ -77,5 +73,6 @@ Key dependencies include (see requirements.txt for full list):
   author or institution.
 * Contribution: Contributions to improve the disease recognition 
   algorithms or bug reports are welcome via Issues or Pull Requests.
+
 
 ==========================================================================
