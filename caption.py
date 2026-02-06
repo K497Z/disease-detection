@@ -1,7 +1,7 @@
 import json
 import re
 
-# 读取 converted.json
+# Read converted.json
 # input_file = r"plantdoc\captions\test\estconverted.json"
 input_file = r".\plantdoc\captions\train\converted_augment.json"
 output_file = r".\plantdoc\captions\train\converted_reformatted.json"
@@ -13,7 +13,7 @@ step_pattern = re.compile(r"Step\s*\d+\s*:\s*", re.IGNORECASE)
 
 
 def process_caption(text):
-    """统一处理 captions 和 captions_bt 的通用函数"""
+    """General function to process captions and captions_bt uniformly"""
     if step_pattern.search(text):
         steps = step_pattern.split(text)[1:]
         if len(steps) >= 7:
@@ -32,18 +32,18 @@ def process_caption(text):
 
 
 for item in data:
-    # 处理 captions
+    # Process captions
     original_captions = item["captions"][0]
     item["captions"] = process_caption(original_captions)
 
-    # 处理 captions_bt（保持相同结构）
+    # Process captions_bt (maintain the same structure)
     if "captions_bt" in item and item["captions_bt"]:
         translated_captions = item["captions_bt"][0]
         item["captions_bt"] = process_caption(translated_captions)
     else:
-        item["captions_bt"] = ["", ""]  # 处理空值情况
+        item["captions_bt"] = ["", ""]  # Handle empty values
 
 with open(output_file, "w", encoding="utf-8") as f:
     json.dump(data, f, indent=4, ensure_ascii=False)
 
-print(f"转换完成！新文件已保存为 {output_file}")
+print(f"Conversion complete! New file saved as {output_file}")
