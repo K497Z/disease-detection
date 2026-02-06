@@ -25,7 +25,7 @@ class EDA:
     """
 
     @staticmethod
-    def _get_synonyms(word):#同义词替换
+    def _get_synonyms(word):# Synonym replacement
         """Generate synonym"""
         synonyms = set()
         for syn in wordnet.synsets(word):
@@ -66,7 +66,7 @@ class EDA:
         # if 'n' in kwargs:
         #     if not isinstance(kwargs['n'], int):
         #         raise TypeError("n must be a valid integer")
-    def validate(**kwargs): #**kwargs：表示函数接受任意数量的关键字参数。这些参数以字典的形式存储在 kwargs 中
+    def validate(**kwargs): # **kwargs: Indicates that the function accepts an arbitrary number of keyword arguments. These arguments are stored in kwargs as a dictionary.
         """Validate input data"""
 
         if 'p' in kwargs:
@@ -95,8 +95,8 @@ class EDA:
         :rtype:   None
         :return:  Constructer do not return.
         """
-        #用于设置停用词列表（stopwords），其作用是在文本处理任务中过滤高频无意义词汇（如 “the”、“is” 等）
-        self.stopwords = stopwords.words('english') if stop_words is None else stop_words#如果参数 stop_words 为 None（即用户未自定义停用词），则使用 nltk 库的英文停用词
+        # Used to set the list of stop words (stopwords), which filters out high-frequency meaningless words (such as "the", "is", etc.) in text processing tasks.
+        self.stopwords = stopwords.words('english') if stop_words is None else stop_words# If the parameter stop_words is None (i.e., the user has not defined custom stop words), use the English stop words from the nltk library.
         self.sentence = None
         self.p = None
         self.n = None
@@ -181,7 +181,7 @@ class EDA:
 
         return " ".join(new_words)
 
-    def random_swap(self, sentence: str, n: int = 1):#这段代码定义了一个名为 random_swap 的方法，用于对输入的句子进行随机单词交换操作。该方法通过多次调用 swap_word 函数，实现对句子中单词的随机交换，从而生成增强后的句子
+    def random_swap(self, sentence: str, n: int = 1):# This code defines a method named random_swap, used to perform random word swapping on the input sentence. This method generates an augmented sentence by calling the swap_word function multiple times to randomly swap words in the sentence.
         """Randomly swap two words in the sentence n times
 
         :type sentence: str
@@ -245,6 +245,3 @@ class EDA:
             return self.random_swap(sentence, n)
         else:
             raise ValueError(f"Unsupported augmentation method: {method}")
-
-
-
