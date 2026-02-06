@@ -29,46 +29,46 @@ class CLIP(nn.Module):
         super().__init__()
         self.visual = image_encode
         self.encode_text = text_encode
-        self.embed_dim = config.model.embed_dim #图像和文本特征的嵌入维度，用于对齐图像和文本特征
+        self.embed_dim = config.model.embed_dim # Embedding dimension for image and text features, used for aligning image and text features
 
         # self.use_gather = config.model.use_gather
-        self.logit_scale = nn.Parameter(torch.ones([]))#缩放相似度得分：将计算得到的相似度得分矩阵乘以 logit_scale
-        # nn.init.constant_(self.logit_scale, np.log(1 / 0.07))#self.logit_scale：一个可训练的参数，用于缩放图像和文本特征之间的相似性分数。这种初始化方式相当于将初始的温度参数设置为 0.07，因为 exp(log(1/0.07)) = 1/0.07。温度参数在对比学习中用于控制相似性分数的分布，较小的温度值会使相似性分数更加尖锐，从而增强对比效果
+        self.logit_scale = nn.Parameter(torch.ones([]))# Scale similarity score: Multiply the calculated similarity score matrix by logit_scale
+        # nn.init.constant_(self.logit_scale, np.log(1 / 0.07))# self.logit_scale: A trainable parameter used to scale the similarity score between image and text features. This initialization is equivalent to setting the initial temperature parameter to 0.07, because exp(log(1/0.07)) = 1/0.07. The temperature parameter is used to control the distribution of similarity scores in contrastive learning. A smaller temperature value makes the similarity scores sharper, thereby enhancing the contrastive effect.
         self.config = config
-        self.eda = EDA()#在训练过程中，EDA 可能用于对输入数据进行增强，例如随机裁剪、颜色抖动等，以提高模型的泛化能力
-        self.eps = eps #一化操作或损失函数中，eps 可以防止除以零或数值不稳定的情况
+        self.eda = EDA()# During training, EDA may be used to augment input data, such as random cropping, color jittering, etc., to improve model generalization.
+        self.eps = eps # In normalization operations or loss functions, eps can prevent division by zero or numerical instability.
 
-        #控制门模块
+        # Gating module
         # self.gate = TextFeatureGatedFusion(hidden_size=512, dropout_prob=0.3).to(config.device)
 
-        # #注意力机制融合模块
+        # # Attention mechanism fusion module
         # self.fusion = CrossModalFusion(dim=512)
-        #双交叉
+        # Dual cross
         # self.cross_fusion = CrossModalAttentionFusion(embed_dim=512).to(self.config.device)
         # self.pvd_proj = nn.Linear(1024, 512)
 
-        # # PVD部分
-        # self.pvd_fc1 = nn.Linear(1024, 256)  # 输入特征降维到256
-        # self.pvd_fc2 = nn.Linear(256, 128)  # PVD模块的第二个投影层
-        # self.pvd_fc3 = nn.Linear(128, 64)  # 最终输出层
-        # #调整 PVD 输出到 512 维
+        # # PVD part
+        # self.pvd_fc1 = nn.Linear(1024, 256)  # Reduce input features to 256 dimensions
+        # self.pvd_fc2 = nn.Linear(256, 128)  # Second projection layer of PVD module
+        # self.pvd_fc3 = nn.Linear(128, 64)  # Final output layer
+        # # Adjust PVD output to 512 dimensions
         # self.pvd_proj = nn.Linear(64, 512)
 
         self.classifier1 = ClassifierHead(input_dim=512, num_classes=num_classes, dropout_prob=0.3)
         # self.classifier2 = ClassifierHead(input_dim=512, hidden_dim=1024, num_classes=num_classes, dropout_prob=0.3)
 
-        # #损失函数
+        # # Loss function
         # self.criterion = torch.nn.CrossEntropyLoss()
 
-        #各自双交叉
+        # Respective dual cross
         # self.cross_text = CrossAttentionTextQueryCLIP(dim=512)
         # self.cross_image = CrossAttentionImageQueryCLIP(dim=512)
 
-        #直接连接
+        # Direct connection
         # self.fusion = nn.Linear(1024, 512)
-        # self.activation = nn.ReLU()  # 可选，也可以换成 GELU、Tanh 等
+        # self.activation = nn.ReLU()  # Optional, can also be changed to GELU, Tanh, etc.
 
-        #transfoemer_decoder
+        # transformer_decoder
         self.fusion = Fusion(config)
         self.fusion2 = Fusion2(config)
         self.liner = nn.Linear(1024, 512)
@@ -76,11 +76,11 @@ class CLIP(nn.Module):
 
 
     def forward(self, input,alpha):
-        # ret = dict() #初始化一个空字典 ret 用于存储各种损失值
+        # ret = dict() # Initialize an empty dictionary ret to store various loss values
 
-        images = input['image'].to(self.config.device) #输入的图像数据 images 和 images_1 移动到指定设备（如 GPU）
+        images = input['image'].to(self.config.device) # Move input image data images and images_1 to the specified device (e.g., GPU)
         # images = input['aug_ss_1'].to(self.config.device)
-        # caption_1 = input['caption_1'] #获取文本数据 texts 和反向翻译后的文本 texts_bt
+        # caption_1 = input['caption_1'] # Get text data texts and back-translated text texts_bt
         # caption_2 = input['caption_2']
         captions = input['caption']
         labels = input['id']
@@ -88,10 +88,10 @@ class CLIP(nn.Module):
         # if 'caption_bt' in input:
         #     texts_bt = input['caption_bt']
         #     # print(texts.shape)
-            #texts包含了所有的caption
+            # texts contains all captions
         # if 'caption_bt_1' in input:
         # # back translation
-        #     if self.config.experiment.back_trans:#在每一个epoch中都是固定的，但是在不同epoch是会改变的，通过这种方式提高泛化能力
+        #     if self.config.experiment.back_trans:# Fixed in each epoch, but changes across different epochs, improving generalization this way
         #         caption_bt_1=input['caption_bt_1']
         #         caption_bt_2=input['caption_bt_2']
         #         for i in range(len(caption_1)):
@@ -101,14 +101,14 @@ class CLIP(nn.Module):
         #             if random.random() < self.config.experiment.backtrans_p:
         #                 caption_2[i] = caption_bt_2[i]
         # random deletion
-        # cap_new = [] #创建一个空列表 cap_new，用于存储经过随机删除操作后的文本
+        # cap_new = [] # Create an empty list cap_new to store text after random deletion operation
         # for text in caption_1:
-        #     eda_alpha = self.config.experiment.eda_alpha #eda_alpha 通常控制着随机删除操作的强度，例如表示删除单词的概率
+        #     eda_alpha = self.config.experiment.eda_alpha # eda_alpha usually controls the intensity of random deletion, e.g., representing the probability of deleting words
         #     cap_new.append(self.eda.random_deletion(text, eda_alpha))
         # caption_1 = cap_new
-        # cap_new = []  # 创建一个空列表 cap_new，用于存储经过随机删除操作后的文本
+        # cap_new = []  # Create an empty list cap_new to store text after random deletion operation
         # for text in caption_2:
-        #     eda_alpha = self.config.experiment.eda_alpha  # eda_alpha 通常控制着随机删除操作的强度，例如表示删除单词的概率
+        #     eda_alpha = self.config.experiment.eda_alpha  # eda_alpha usually controls the intensity of random deletion, e.g., representing the probability of deleting words
         #     cap_new.append(self.eda.random_deletion(text, eda_alpha))
         # caption_2 = cap_new
 
@@ -117,7 +117,7 @@ class CLIP(nn.Module):
         # caption_2 = self.augment_batch(caption_2, self.eda,method='sr', n=2)
 
         # MLM
-        if self.config.experiment.mlm:#这里为false
+        if self.config.experiment.mlm:# False here
             text_tokens, mlm_labels = tokenize(captions, context_length=self.config.experiment.text_length,
                                                mask_type='MLM')
             text_tokens = text_tokens.to(self.config.device)
@@ -127,46 +127,46 @@ class CLIP(nn.Module):
             # text_tokens2 = tokenize(caption_2, context_length=self.config.experiment.text_length).to(self.config.device)
             text_tokens = tokenize(captions, context_length=self.config.experiment.text_length).to(self.config.device)
 
-        visual_features, image_seq_embeddings = self.encode_image(images, return_dense=True) #当return_dense 被设置为 True 时，encode_image 方法会返回两个结果，即 image_features 和 image_seq_embedding
+        visual_features, image_seq_embeddings = self.encode_image(images, return_dense=True) # When return_dense is set to True, the encode_image method returns two results: image_features and image_seq_embedding
         # text_features1, text_seq_embeddings = self.encode_text(text_tokens1, return_dense=True)
         # text_features2, text_seq_embeddings = self.encode_text(text_tokens2, return_dense=True)
         text_features, text_seq_embeddings = self.encode_text(text_tokens, return_dense=True)
 
-        #门控模块
+        # Gating module
         # text_features = self.gate(text_features1, text_features2)
 
-        #注意力融合
-        # fused_features = self.fusion(visual_features, text_features)  # 使用注意力融合
+        # Attention fusion
+        # fused_features = self.fusion(visual_features, text_features)  # Use attention fusion
 
-        #交叉注意力模块
+        # Cross-attention module
         # out_text, out_image, fused = self.cross_fusion(text_features, visual_features)
 
-        # # PVD模块
+        # # PVD module
         # pvd_features = torch.cat((visual_features, text_features), dim=1)  # [batch_size, 1024]
         # pvd_out = torch.relu(self.pvd_fc1(pvd_features))  # [batch_size, 256]
         # pvd_out = torch.relu(self.pvd_fc2(pvd_out))  # [batch_size, 128]
         # pvd_out = torch.relu(self.pvd_fc3(pvd_out))  # [batch_size, 64]
         # pvd_out = torch.relu(self.pvd_proj(pvd_out))  # [batch_size, 512]
-        # # 确保数据类型一致
+        # # Ensure consistent data types
         # # visual_features = visual_features.float()
         # # # text_features = text_features.float()
         # # # pvd_out = pvd_out.float()
-        # # 特征相加
+        # # Add features
         # combined_features = visual_features + text_features + pvd_out  # [batch_size, 512]
 
 
         # combined_features = visual_features + fused_features # [batch_size, 512]
-        #各自双交叉
+        # Respective dual cross
         # fusion_text = self.cross_text(text_features, visual_features)
         # fusion_image = self.cross_image(visual_features,fusion_text )
         # fused_features =fusion_text + fusion_image
 
-        #直接连接
+        # Direct connection
         # fused = torch.cat([visual_features, text_features], dim=1)  # (batch_size, 1024)
         # output = self.activation(self.fusion(fused))
         # fused_features = visual_features + text_features
 
-        #transformer_decoder
+        # transformer_decoder
         text_fused = self.fusion2(text_features, visual_features, text_tokens)
         image_fused = self.fusion(visual_features, text_features)
         # fused = text_fused + image_fused
@@ -213,15 +213,15 @@ class CLIP(nn.Module):
                     return self.encode_text.text_projection.weight.dtype
 
     def encode_image(self, image, return_dense=False):
-        if return_dense: #传过来true
-            output = self.visual(image.type(self.dtype), return_dense=return_dense)#return_dense：一个布尔类型的参数，默认值为 False。当设置为 True 时，表示需要返回密集的特征表示；当设置为 False 时，返回默认的特征表示。
+        if return_dense: # Passed True
+            output = self.visual(image.type(self.dtype), return_dense=return_dense)# return_dense: A boolean parameter, default is False. When set to True, indicates that dense feature representation needs to be returned; when set to False, returns default feature representation.
             return output
         output = self.visual(image.type(self.dtype))
         return output
 
     def augment_batch(self, text_list, eda, method=None, n=1, p=0.1):
         """
-        对一个文本列表批量增强
+        Batch augment a list of texts
 
         """
         # print(f"eda type: {type(eda)}")
@@ -230,25 +230,25 @@ class CLIP(nn.Module):
         return [eda.augment(text, method=method, n=n, p=p) for text in text_list]
 
     def clip_contrastive_loss(self,image_features, text_features,labels, logit_scale=100.0):
-        # 保证归一化
+        # Ensure normalization
         image_features = F.normalize(image_features, dim=-1)
         text_features = F.normalize(text_features, dim=-1)
 
-        # 计算相似度矩阵：[B, B]
+        # Calculate similarity matrix: [B, B]
         logits_per_image = logit_scale * image_features @ text_features.T
-        logits_per_text = logits_per_image.T  # 对称的
+        logits_per_text = logits_per_image.T  # Symmetric
 
-        # 生成标签（0~B-1）作为 ground truth
+        # Generate labels (0~B-1) as ground truth
         # batch_size = image_features.size(0)
         # labels = torch.arange(batch_size, device=image_features.device)
 
-        # 双向 cross entropy：图像->文本，文本->图像
+        # Bidirectional cross entropy: image->text, text->image
         loss_i2t = F.cross_entropy(logits_per_image, labels)
         loss_t2i = F.cross_entropy(logits_per_text, labels)
 
         return (loss_i2t + loss_t2i) / 2
 
-def clip_vitb(config, num_classes=11003): #该函数会分别初始化图像编码器和文本编码器，然后将它们组合到一个 CLIP 模型中返回
+def clip_vitb(config, num_classes=11003): # This function will initialize the image encoder and text encoder separately, and then combine them into a CLIP model to return
     image_encode = visual_transformer(config)
     text_encode = text_transformers(config)
     model = CLIP(config, image_encode, text_encode, num_classes, config.experiment.ritc_eps)
