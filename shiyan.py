@@ -1,6 +1,3 @@
-Here is the updated code with all comments and output messages translated into English:
-
-```python
 # # Usage example
 # import json
 #
@@ -94,5 +91,3 @@ with open(r"zhiwubindu\captions\train\converted.json", "w", encoding="utf-8") as
     json.dump(converted_data, f, ensure_ascii=False, indent=4)
 
 print("Conversion complete, data saved to converted.json")
-
-```
